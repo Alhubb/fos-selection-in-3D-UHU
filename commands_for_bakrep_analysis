@@ -1,0 +1,153 @@
+# ============================================================
+# DOWNLOAD GENOME FASTA FROM BAKREP
+# ============================================================
+bakrep download -t /media/external/3D_UHU/bakrep-export.tsv -d /media/alasdair/bakrep/ecoli
+
+#!/bin/bash
+
+# ============================================================
+# COMPLETE COMMAND REFERENCE
+# All scripts in /home/alasdair/3D_UHU_evo_analysis/scripts/
+# ============================================================
+export SCRIPTS=/home/alasdair/3D_UHU_evo_analysis/scripts
+export BASE=/home/alasdair/3D_UHU_evo_analysis
+export GENOME_FASTA_DIR=/media/alasdair/External/3D_UHU/bakrep/fasta
+export MUTATION_LIST=$BASE/mutation_list.tsv
+
+# ============================================================
+# STEP 1 — Make all scripts executable (run once)
+# ============================================================
+chmod +x $SCRIPTS/run_pipeline.sh
+chmod +x $SCRIPTS/minimap_loop.sh
+chmod +x $SCRIPTS/paf_loop.sh
+
+# ============================================================
+# STEP 2 — Map WT genes against all genomes (minimap2)
+# Produces PAF files on the external drive
+# Runtime: ~6 hours at 4 cores
+# External drive must be mounted
+# ============================================================
+conda activate minimap2
+$SCRIPTS/minimap_loop.sh
+conda deactivate
+
+# ============================================================
+# STEP 3 — Extract gene CDS from assemblies using PAF files
+# External drive must be mounted
+# ============================================================
+$SCRIPTS/paf_loop.sh
+
+# ============================================================
+# STEP 4 — Convert Snippy output to mutation list (run once)
+# Only needed if you have new Snippy output to convert
+# ============================================================
+conda run -n python python $SCRIPTS/convert_snippy_to_mutation_list.py \
+    /path/to/snippy_output.tsv \
+    $BASE/mutation_list.tsv
+
+# ============================================================
+# STEP 5 — Run the main analysis pipeline
+# External drive must be mounted
+# ============================================================
+$SCRIPTS/run_pipeline.sh
+
+# ============================================================
+# INDIVIDUAL PIPELINE STEPS (if rerunning specific steps only)
+# NOTE: all steps that use MACSE alignments must use
+# macse_output_clean (post-alignment gap filtered), not macse_output
+# ============================================================
+
+# --- Build per-gene FASTAs ---
+# (done inline by run_pipeline.sh — no standalone script)
+
+# --- Deduplicate per-gene FASTAs (cd-hit-est) ---
+# (done inline by run_pipeline.sh)
+
+# --- Clean per-gene FASTAs ---
+conda run -n python python $SCRIPTS/clean_gene_fastas.py \
+    $BASE/per_gene_fastas_dedup \
+    $BASE/per_gene_fastas_clean
+
+# --- MACSE codon-aware alignment ---
+# (done inline by run_pipeline.sh using xargs -P 4)
+
+# --- Clean MACSE alignments ---
+STOP_LOST_GENES=$(awk -F'\t' '$4=="stop_lost" {print $1}' "$MUTATION_LIST" \
+    | sort -u | paste -sd,)
+conda run -n python python $SCRIPTS/clean_macse_alignments.py \
+    $BASE/macse_output \
+    $BASE/macse_output_clean \
+    ${STOP_LOST_GENES:+--stop-lost-genes "$STOP_LOST_GENES"}
+
+# --- MACSE mutation scan ---
+conda run -n python python $SCRIPTS/scan_mutations_cds_macse.py \
+    $BASE/macse_output_clean \
+    $MUTATION_LIST \
+    > $BASE/mutation_cds_macse_strict_summary.tsv
+
+# --- Frameshift detection ---
+conda run -n python python $SCRIPTS/detect_frameshifts_macse.py \
+    $BASE/macse_output_clean \
+    $MUTATION_LIST \
+    $BASE/frameshifts.tsv
+
+# --- In-frame indel detection ---
+conda run -n python python $SCRIPTS/detect_indels_macse.py \
+    $BASE/macse_output_clean \
+    $MUTATION_LIST \
+    $BASE/indels.tsv
+
+# --- Stop mutation detection ---
+# Requires MUTATION_LIST for position-aware tiering (exact/regional/gene)
+mkdir -p $BASE/stop_calls
+> $BASE/stop_calls/stop_calls.tsv
+for f in $BASE/per_gene_fastas_clean/*.fasta; do
+    conda run -n python python $SCRIPTS/detect_stop_mutations.py "$f" \
+        "$MUTATION_LIST" \
+        >> $BASE/stop_calls/stop_calls.tsv
+done
+awk 'NF >= 4 { print $1 "\t" $2 "\t" $3 "\t" $4 }' \
+    $BASE/stop_calls/stop_calls.tsv \
+    | sort -u > $BASE/stop_genes.tsv
+
+# --- Mutation screening ---
+conda run -n python python $SCRIPTS/screen_mutations.py \
+    --mutations   $MUTATION_LIST \
+    --macse       $BASE/mutation_cds_macse_strict_summary.tsv \
+    --frameshifts $BASE/frameshifts.tsv \
+    --indels      $BASE/indels.tsv \
+    --stops       $BASE/stop_genes.tsv \
+    --output      $BASE/mutation_screen_results.tsv
+
+# --- Extract confirmed sequences (for visual verification) ---
+# --any:            also extract any_missense hits (e.g. cyaA 394)
+# --screen-results: needed for deletion component and regional extraction
+conda run -n python python $SCRIPTS/extract_confirmed_sequences.py \
+    $BASE/macse_output_clean \
+    $BASE/mutation_cds_macse_strict_summary.tsv \
+    $MUTATION_LIST \
+    $BASE/confirmed_sequences \
+    --frameshifts     $BASE/frameshifts.tsv \
+    --stops           $BASE/stop_genes.tsv \
+    --per-gene-fastas $BASE/per_gene_fastas_clean \
+    --screen-results  $BASE/mutation_screen_results.tsv \
+    --any
+
+# ============================================================
+# STANDALONE / UTILITY SCRIPTS
+# ============================================================
+
+# --- Count evidence in confirmed sequences ---
+# Output defaults to confirmed_sequences/confirmed_evidence_counts.tsv
+# or specify a file/directory as second argument
+conda run -n python python $SCRIPTS/count_confirmed_evidence.py \
+    $BASE/confirmed_sequences \
+    $BASE
+
+# --- Count mutation types per gene (spectrum analysis) ---
+# Paths are hardcoded in the script (reads macse_output_clean,
+# per_gene_fastas_dedup; writes mutation_spectrum_per_gene.tsv)
+conda run -n python python $SCRIPTS/count_mutation_types_per_gene.py \
+    $BASE/per_gene_fastas_dedup \
+    $BASE/macse_output_clean \
+    $BASE/mutation_spectrum_per_gene.tsv
