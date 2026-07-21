@@ -1,0 +1,1026 @@
+##############################################
+R ANALYSIS AND FIGURE GENERATION SCRIPT
+ 
+This script generates all plots and summary 
+statistics used in the manuscript.
+
+Required input data objects:
+	MIC_Tidy.xlsx
+	DD_Tidy_vsB.xlsx
+	Fitness_Tidy.xlsx
+	Mutation_Screen_Tidy2
+	X34Mut_Tidy
+	X59Mut_Tidy
+	Evo_Mutation_Spectrum_Tidy
+
+Author: Alasdair Hubbard
+Last updated: [Date]
+##############################################
+
+##########################
+# Load required packages
+##########################
+
+library(ggplot2)
+library(ggpubr)
+library(dplyr)
+library(wesanderson)
+library(readxl)
+library(tibble)
+library(circlize)
+library(RColorBrewer)
+library(tidyr)
+
+#########################################
+# Figure 1A: MIC dot plot for ancestor isolates
+#########################################
+
+ggplot(MIC_Tidy, aes(x = Media, y = MIC, fill = Media)) +
+    geom_dotplot(
+        binaxis = "y",
+        stackdir = "center",
+        binwidth = 0.3
+    ) +
+    stat_summary(
+        fun = mean,
+        geom = "crossbar",
+        width = 0.2,
+        size = 1,
+        color = "blue"
+    ) +
+    geom_hline(yintercept = 8, linetype = "dashed") +
+    scale_y_continuous(trans = "log2") +
+    coord_cartesian(ylim = c(1, 16)) +
+    facet_wrap(~ Isolate) +
+    scale_fill_manual(values = wes_palette("GrandBudapest2", n = 2)) +
+    labs(
+        x = "Isolate",
+        y = expression("Fosfomycin concentration (" * mu * "g/mL)")
+    ) +
+    theme_bw()+
+    theme(
+        axis.text  = element_text(size = 16, face = "bold"),
+        axis.title = element_text(size = 18, face = "bold"),
+        strip.text = element_text(size = 18, face = "bold"),
+        legend.position = "none"
+    )
+
+#########################################
+# Figure 2A: Circular mutation plots for UTI-34
+#########################################
+
+graphics.off()
+circos.clear()
+
+genomes <- unique(X34Mut_Tidy$genome)
+genome_length <- 4946915
+
+radii <- seq(0.25, 0.75, length.out = length(genomes))
+names(radii) <- genomes
+
+mut_shapes <- c(
+  snp = 1,   
+  ins = 17,  
+  del = 15 
+)
+
+circos.par(
+  start.degree = 90,
+  gap.degree = 0,
+  track.margin = c(0, 0),
+  cell.padding = c(0, 0, 0, 0),
+  points.overflow.warning = FALSE
+)
+
+circos.initialize(
+  factors = "chr",
+  xlim = c(0, genome_length)
+)
+
+label_data <- X34Mut_Tidy[!duplicated(X34Mut_Tidy$gene), ]
+
+circos.trackPlotRegion(
+  ylim = c(0, 1),
+  track.height = 0.8,
+  bg.border = NA,
+
+  panel.fun = function(x, y) {
+
+    for (g in genomes) {
+      circos.lines(
+        x = seq(0, genome_length, length.out = 300),
+        y = rep(radii[g], 300),
+        col = "LightSteelBlue",
+        lwd = 8
+      )
+    }
+
+    for (g in genomes) {
+
+      dat <- X34Mut_Tidy[X34Mut_Tidy$genome == g, ]
+
+      circos.points(
+        x = dat$position,
+        y = rep(radii[g], nrow(dat)),
+        pch = mut_shapes[dat$mut_type],
+        col = "black",
+        cex = 1
+      )
+    }
+
+    label_radius <- max(radii) + 0.12
+    label_y <- rep(label_radius, nrow(label_data))
+
+    label_y[label_data$gene == "uhpC"] <- label_radius - 0.75
+
+    for (i in seq_len(nrow(label_data))) {
+
+      circos.segments(
+        x0 = label_data$position[i],
+        y0 = radii[label_data$genome[i]],
+        x1 = label_data$position[i],
+        y1 = label_y[i] - 0.01,
+        col = "#00000080",
+        lwd = 1,
+        lty = 2
+      )
+
+      circos.text(
+        x = label_data$position[i],
+        y = label_y[i],
+        labels = label_data$gene[i],
+        cex = 1,   # larger labels
+        facing = "outside",
+        niceFacing = TRUE
+      )
+    }
+  }
+)
+legend(
+  "bottomleft",
+  legend = c("SNP", "Insertion", "Deletion"),
+  pch = c(1, 17, 15),
+  col = "black",
+  pt.cex = 1.2,
+  bty = "n"
+)
+
+#########################################
+# Figure 2B: Circular mutation plots for UTI-59
+#########################################
+
+graphics.off()
+circos.clear()
+
+genomes <- unique(X59Mut_Tidy$genome)
+genome_length <- 5064822
+
+radii <- seq(0.25, 0.75, length.out = length(genomes))
+names(radii) <- genomes
+
+mut_shapes <- c(
+  snp     = 1,   
+  complex = 4,   
+  del     = 15   
+)
+
+circos.par(
+  start.degree = 90,
+  gap.degree = 0,
+  track.margin = c(0, 0),
+  cell.padding = c(0, 0, 0, 0),
+  points.overflow.warning = FALSE
+)
+
+circos.initialize(
+  factors = "chr",
+  xlim = c(0, genome_length)
+)
+
+label_data <- X59Mut_Tidy[!duplicated(X59Mut_Tidy$gene), ]
+
+circos.trackPlotRegion(
+  ylim = c(0, 1),
+  track.height = 0.8,
+  bg.border = NA,
+
+  panel.fun = function(x, y) {
+
+    for (g in genomes) {
+      circos.lines(
+        x = seq(0, genome_length, length.out = 300),
+        y = rep(radii[g], 300),
+        col = "pink",
+        lwd = 8
+      )
+    }
+
+    for (g in genomes) {
+
+      dat <- X59Mut_Tidy[X59Mut_Tidy$genome == g, ]
+
+      circos.points(
+        x = dat$position,
+        y = rep(radii[g], nrow(dat)),
+        pch = mut_shapes[dat$mut_type],
+        col = "black",
+        cex = 1
+      )
+    }
+
+    label_radius <- max(radii) + 0.12
+    label_y <- rep(label_radius, nrow(label_data))
+
+    x_positions <- label_data$position
+
+    x_positions[label_data$gene == "uhpA"] <-
+      	x_positions[label_data$gene == "uhpA"] - 200000
+
+    for (i in seq_len(nrow(label_data))) {
+
+    circos.segments(
+	x0 = label_data$position[i],   
+	y0 = radii[label_data$genome[i]],
+	x1 = x_positions[i],           
+	y1 = label_y[i] - 0.01,
+	col = "#00000080",
+  	lwd = 1,
+  	lty = 2
+     )
+
+      circos.text(
+        x = x_positions[i],
+        y = label_y[i],
+        labels = label_data$gene[i],
+        cex = 1,
+        facing = "outside",
+        niceFacing = TRUE
+      )
+    }
+  }
+)
+
+legend(
+  "bottomleft",
+  legend = c("SNP", "Complex", "Deletion"),
+  pch = c(1, 4, 15),
+  col = "black",
+  pt.cex = 1.2,
+  bty = "n"
+)
+
+###########################################################
+# Figure 2C: Heat map of presence/absence from mutation screening
+###########################################################
+
+df <- read_xlsx("Mutation_Screen_Tidy.xlsx")
+
+df <- df %>%
+    mutate(
+        position  = ifelse(aa_start == aa_end,
+                           as.character(aa_start),
+                           paste0(aa_start, "\u2013", aa_end)),
+        row_label = paste0(gene, " ", position, " [", mutant, "]\n(", mutation_type, ")")
+    )
+
+row_order <- rev(df$row_label)
+
+evidence_cols <- c(
+    "exact_missense",        
+    "any_missense", 
+    "exact_frameshift",    
+    "regional_frameshift", 
+    "gene_frameshift",     
+    "exact_deletion",      
+    "regional_indel",      
+    "gene_indel",          
+    "exact_stop",		
+    "regional_stop", 	
+    "gene_stop",		
+    "final_confirmed"	
+)
+
+evidence_labels <- c(
+    "exact_missense"        = "Missense\n(exact)",
+    "any_missense"  = "Missense\n(any missense)",
+    "exact_frameshift"    = "Frameshift\n(exact position)",
+    "regional_frameshift" = "Frameshift\n(regional \u00b120 aa)",
+    "gene_frameshift"     = "Frameshift\n(gene-level)",
+    "exact_deletion"      = "Deletion\n(exact window)",
+    "regional_indel"      = "Indel\n(regional \u00b120 aa)",
+    "gene_indel"          = "Indel\n(gene-level)",
+    "exact_stop"		= "Stop codon\n(exact position)",
+    "regional_stop" 	= "Stop codon\n(regional \u00b120 aa)",
+    "gene_stop"		= "Stop codon\n(gene-level)",
+    "final_confirmed"	= "Confirmed"
+)
+
+exact_cols   <- c("exact_missense", "exact_frameshift",
+                  "exact_deletion", "stop_confirmed", "exact_stop")
+partial_cols <- c("any_missense", "regional_frameshift",
+                  "gene_frameshift", "regional_indel", "gene_indel", "regional_stop", "gene_stop")
+present_cols <- c("final_confirmed")
+
+assign_tier <- function(col, value) {
+    if (value == 0)            return("Absent")
+    if (col %in% exact_cols)   return("Exact")
+    if (col %in% partial_cols) return("Partial")
+    if (col %in% present_cols) return("Present")
+    return("Absent")
+}
+
+tier_colours <- c(
+    "Exact"   = "#85D4E3",
+    "Partial" = "#F4B5BD",
+    "Absent"  = "#f0f0f0",
+    "Present" = "#FAD77B"
+)
+
+long_df <- df %>%
+    select(row_label, mutation_type, mutant, all_of(evidence_cols)) %>%
+    pivot_longer(cols      = all_of(evidence_cols),
+                 names_to  = "evidence",
+                 values_to = "value") %>%
+    rowwise() %>%
+    mutate(tier = assign_tier(evidence, value)) %>%
+    ungroup() %>%
+    mutate(
+        row_label = factor(row_label, levels = row_order),
+        evidence  = factor(evidence,
+                           levels = evidence_cols,
+                           labels = evidence_labels[evidence_cols]),
+        tier      = factor(tier, levels = c("Exact", "Partial", "Absent", "Present"))
+    )
+
+ggplot(long_df,
+       aes(x = evidence, y = row_label, fill = tier)) +
+    
+    geom_tile(colour = "white", linewidth = 0.5) +
+    
+    scale_fill_manual(
+        values = tier_colours,
+        name   = "Evidence level",
+        guide  = guide_legend(title.position = "top",
+                              keywidth  = unit(1.0, "cm"),
+                              keyheight = unit(0.5, "cm"))
+    ) +
+    
+    labs(x = NULL, y = NULL) +
+    
+    theme_minimal(base_size = 12) +
+    theme(
+        axis.text.x     = element_text(angle = 90, face = "bold", hjust = 1,
+                                       vjust = 0.5, size = 12),
+        axis.text.y     = element_text(size = 12, face = "bold", lineheight = 0.85,
+                                       family = "mono"),
+        panel.grid      = element_blank(),
+        legend.position = "bottom",
+        legend.box      = "horizontal",
+        legend.title    = element_text(face = "bold", size = 10),
+        legend.text     = element_text(size = 10, face = "bold"),
+        plot.margin     = margin(10, 50, 10, 20)
+    ) +
+    
+    coord_cartesian(clip = "off") +
+    scale_x_discrete(expand = expansion(add = c(0.5, 0.5)))
+
+####################################################
+# Figure 2D: Barplot of the evidence of mutation calls per gene
+####################################################
+
+ggplot(
+    Evidence_Tidy,
+    aes(x = gene, y = unique)
+    ) +
+    geom_bar(
+        stat = "identity",
+        position = "stack",
+        aes(fill = mutation)
+    ) +
+    labs(
+        x = "Gene",
+        y = "Number"
+    ) +
+    scale_fill_brewer(
+	palette = "Set3",
+	name = "Mutation Type",
+	)+
+    theme_bw() +
+    theme(
+        axis.text    = element_text(size = 12, face = "bold"),
+        axis.title   = element_text(size = 18, face = "bold"),
+        legend.text  = element_text(size = 16),
+        legend.title = element_text(size = 16, face = "bold")
+    )
+
+####################################################
+# Figure 2E: Staked barplot of the mutation spectrum of each gene
+####################################################
+
+ggplot(
+  Evo_Mutation_Spectrum_Tidy,
+  aes(
+    x = gene, y = value)
+  )+
+  geom_bar(
+    stat = "identity",
+    position = "stack",
+    aes(fill = mutation)
+  ) +
+  labs(
+    x = "Gene",
+    y = "Number"
+  ) +
+  scale_x_discrete(
+    limits = c(
+      "cyaA_34",
+      "glpT_34",
+      "ptsI_34",
+      "uhpC_34",
+      "uhpT_34",
+      "glpT_59",
+      "uhpA_59",
+      "uhpT_59"
+    )
+  ) +
+  scale_fill_brewer(
+	palette = "Set3",
+	name = "Mutation Type"
+  )+
+  theme_bw() +
+  theme(
+    axis.text    = element_text(size = 12, face = "bold"),
+    axis.title   = element_text(size = 18, face = "bold"),
+    legend.text  = element_text(size = 16),
+    legend.title = element_text(size = 16, face = "bold")
+  )
+
+
+#######################################################
+# Figure 3A: Disc diffusion of UTI-34 and fosfomycin-selected clones vs breakpoint
+#######################################################
+
+#statistics for both 3A & 3B
+
+run_test <- function(data) {
+  evolvedvals <- subset(data, Type=="FOT-R")$MM
+  ancestorvals <- subset(data, Type=="Ancestor")$MM
+  if (length(evolvedvals) > 1) {
+    shapiroat <- shapiro.test(ancestorvals)
+    shapiroa <- shapiroat$p.value
+    shapiroet <- shapiro.test(evolvedvals)
+    shapiroe <- shapiroet$p.value
+  }
+  if(shapiroa<0.05 | shapiroe<0.05){
+    test <- wilcox.test(data$MM~data$Type)
+    p <- test$p.value
+
+    tibble(
+      p_value = p
+    )
+  } else {
+    test <- t.test(data$MM~data$Type)
+    p <- test$p.value
+
+    tibble(
+      p_value = p
+
+    )
+  }
+}
+
+results <- DD_Tidy_vsB %>%
+  group_by(Antibiotic, Ancestor ) %>%
+  group_modify(~ run_test(.x)) %>%
+  ungroup()
+
+results <- results %>%
+  mutate(
+    p_adj = p.adjust(results$p_value, method = "BH"),
+    stars = case_when(
+      p_adj < 0.001 ~ "***",
+      p_adj < 0.01 ~ "**",
+      p_adj < 0.05 ~ "*",
+      TRUE ~ NA_character_
+    )
+  )
+
+ggplot(
+    subset(DD_Tidy_vsB, Ancestor %in% c("UTI-34")),
+    aes(x = Type, y = MM)
+) +
+    geom_dotplot(
+        binaxis = "y",
+        stackdir = "center",
+        binwidth = 1.8,
+        aes(fill = Ancestor)
+    ) +
+    stat_summary(
+        fun = mean,
+        geom = "crossbar",
+        width = 0.1,
+        size = 0.75,
+        color = "blue"
+    ) +
+    geom_hline(yintercept = 0, linetype = "dashed") +
+    facet_wrap(~ Antibiotic) +
+    coord_cartesian(ylim = c(-20, 20)) +
+    scale_fill_manual(values = wes_palette("GrandBudapest2", n = 2)) +
+    labs(
+        x = "Isolate",
+        y = "Zone of inhibition (mm)"
+    ) +
+    theme_bw()+
+    theme(
+        axis.text  = element_text(size = 16, face = "bold"),
+        axis.title = element_text(size = 16, face = "bold"),
+        strip.text = element_text(size = 18, face = "bold"),
+        legend.position = "none"
+    ) +
+    geom_text(data=subset(results, Ancestor=="UTI-34"), aes( x="FOT-R", y=18, label=stars),               
+              size=8)
+
+#######################################################
+# Figure 3B: Disc diffusion of UTI-59 and fosfomycin-selected clones vs breakpoint
+#######################################################
+
+ggplot(
+    subset(DD_Tidy_vsB, Ancestor %in% c("UTI-59")),
+    aes(x = Type, y = MM)
+) +
+    geom_dotplot(
+        binaxis = "y",
+        stackdir = "center",
+        binwidth = 1.8,
+        aes(fill = Ancestor)
+    ) +
+    stat_summary(
+        fun = mean,
+        geom = "crossbar",
+        width = 0.1,
+        size = 0.75,
+        color = "blue"
+    ) +
+    geom_hline(yintercept = 0, linetype = "dashed") +
+    facet_wrap(~ Antibiotic) +
+    coord_cartesian(ylim = c(-20, 20)) +
+    scale_fill_manual(values = wes_palette("GrandBudapest2", n = 2)) +
+    labs(
+        x = "Isolate",
+        y = "Zone of inhibition (mm)"
+    ) +
+    theme_bw()+
+    theme(
+        axis.text  = element_text(size = 16, face = "bold"),
+        axis.title = element_text(size = 16, face = "bold"),
+        strip.text = element_text(size = 18, face = "bold"),
+        legend.position = "none"
+    ) +
+    geom_text(data=subset(results, Ancestor=="UTI-59"), aes( x="FOT-R", y=18, label=stars),               
+              size=8)
+  
+#####################################
+# Figure 3C: Relative fitness of fosfomycin-selected UTI-34 variants in MHB
+#####################################
+
+#statistics for both 3C & 3D
+
+run_test <- function(data) {
+    vals <- data$Value
+    if (length(vals) > 1) {
+        shapirot <- shapiro.test(vals)
+        shapiro <- shapirot$p.value
+    } 
+    if(shapiro<0.05){
+        test <- wilcox.test(vals, mu=1)
+        p <- test$p.value
+        tibble(
+            p_value = p 
+        )
+    } else {
+        test <- t.test(vals, mu=1)
+        p <- test$p.value
+        tibble(
+            p_value = p
+        )
+    } 
+}
+
+results <- Fitness_Tidy %>%
+    group_by(Isolate, Ancestor, Parameter ) %>%
+    group_modify(~ run_test(.x)) %>%
+    ungroup()
+
+results <- results %>%
+    mutate(
+        p_adj = p.adjust(results$p_value, method = "BH"),
+        stars = case_when(
+            p_adj < 0.001 ~ "***",
+            p_adj < 0.01  ~ "**",
+            p_adj < 0.05  ~ "*",
+            TRUE ~ NA_character_
+        )
+    )
+
+ggplot(subset(Fitness_Tidy, Ancestor %in% c("UTI-34")), aes(x = Isolate, y = Value, fill = Ancestor)) +
+    geom_boxplot() +
+    geom_dotplot(
+        binaxis = "y",
+        stackdir = "center",
+        binwidth = 0.03,
+    ) +
+    geom_hline(yintercept=1, linetype = "dashed") +
+    facet_wrap(~ Parameter) +
+    scale_fill_manual(values = wes_palette("GrandBudapest2", n = 2)) +
+    coord_cartesian(ylim = c(0.5, 1.5)) +
+    labs(
+        x = "Isolate",
+        y = "Relative fitness"
+    ) +
+    theme_bw()+
+    theme(
+        axis.text = element_text(size = 16, face = "bold"),
+        axis.title = element_text(size = 16, face = "bold"),
+        strip.text = element_text(size = 20, face = "bold"),
+        legend.position = "none"
+    )+
+    geom_text(data=subset(results, Ancestor=="UTI-34"), aes(x=Isolate, y=1.25, label=stars),               
+              size=12))
+
+#####################################
+# Figure 3D: Relative fitness of fosfomycin-selected UTI-59 variants in MHB
+#####################################
+
+ggplot(subset(Fitness_Tidy, Ancestor %in% c("UTI-59")), aes(x = Isolate, y = Value, fill = Ancestor)) +
+  geom_boxplot() +
+  geom_dotplot(
+    binaxis = "y",
+    stackdir = "center",
+    binwidth = 0.03,
+  ) +
+  geom_hline(yintercept=1, linetype = "dashed") +
+  facet_wrap(~ Parameter) +
+  scale_fill_manual(values = wes_palette("GrandBudapest2", n = 2)) +
+  coord_cartesian(ylim = c(0.5, 1.5)) +
+  labs(
+    x = "Isolate",
+    y = "Relative fitness"
+  ) +
+  theme_bw()+
+  theme(
+    axis.text = element_text(size = 16, face = "bold"),
+    axis.title = element_text(size = 16, face = "bold"),
+    strip.text = element_text(size = 20, face = "bold"),
+    legend.position = "none"
+  )+
+  geom_text(data=subset(results, Ancestor=="UTI-59"), aes(x=Isolate, y=1.25, label=stars),               
+            size=8)
+
+####################################################
+# Supplementary Figure S2: Heatmap for Average Nucleotide Identity
+####################################################
+
+ggplot(
+	ANI_Tidy,
+	aes(x=Mutant, y=Ancestor, fill=Value)
+    ) +
+    geom_tile(
+	color = "black"
+    ) +
+    theme_bw()+
+    scale_fill_gradient(
+	low="#85D4E3",
+	high = "#F4B5BD"
+    ) +
+    guides(
+	fill = guide_colourbar(
+		title = "Percentage (%)",
+		barwidth = 2,
+		barheight = 10,
+		)
+    ) +
+    theme(
+	axis.text=element_text(size=30, face="bold"),
+	axis.title=element_text(size=30,face="bold"),
+	legend.text = element_text(size = 16),
+	legend.title=element_text(size = 20, angle =270, hjust = 0.5),
+	legend.title.position = "right",
+	axis.title.x=element_blank(),
+	axis.title.y=element_blank()
+	)
+
+
+###########################################################
+# Supplementary Figure S4: Heat map of presence/absence from training data mutation screening
+###########################################################
+
+df <- read_xlsx("Mutation_Screen_Tidy_TD.xlsx")
+
+df <- df %>%
+    mutate(
+        position  = ifelse(aa_start == aa_end,
+                           as.character(aa_start),
+                           paste0(aa_start, "\u2013", aa_end)),
+        row_label = paste0(gene, " ", position, " [", mutant, "]\n(", mutation_type, ")")
+    )
+
+row_order <- rev(df$row_label)
+
+evidence_cols <- c(
+    "exact_missense",        
+    "any_missense", 
+    "exact_frameshift",    
+    "regional_frameshift", 
+    "gene_frameshift",     
+    "exact_deletion",      
+    "regional_indel",      
+    "gene_indel",          
+    "exact_stop",		
+    "regional_stop", 	
+    "gene_stop",		
+    "final_confirmed"	
+)
+
+evidence_labels <- c(
+    "exact_missense"        = "Missense\n(exact)",
+    "any_missense"  = "Missense\n(any missense)",
+    "exact_frameshift"    = "Frameshift\n(exact position)",
+    "regional_frameshift" = "Frameshift\n(regional \u00b120 aa)",
+    "gene_frameshift"     = "Frameshift\n(gene-level)",
+    "exact_deletion"      = "Deletion\n(exact window)",
+    "regional_indel"      = "Indel\n(regional \u00b120 aa)",
+    "gene_indel"          = "Indel\n(gene-level)",
+    "exact_stop"		= "Stop codon\n(exact position)",
+    "regional_stop" 	= "Stop codon\n(regional \u00b120 aa)",
+    "gene_stop"		= "Stop codon\n(gene-level)",
+    "final_confirmed"	= "Confirmed"
+)
+
+exact_cols   <- c("exact_missense", "exact_frameshift",
+                  "exact_deletion", "stop_confirmed", "exact_stop")
+partial_cols <- c("any_missense", "regional_frameshift",
+                  "gene_frameshift", "regional_indel", "gene_indel", "regional_stop", "gene_stop")
+present_cols <- c("final_confirmed")
+
+assign_tier <- function(col, value) {
+    if (value == 0)            return("Absent")
+    if (col %in% exact_cols)   return("Exact")
+    if (col %in% partial_cols) return("Partial")
+    if (col %in% present_cols) return("Present")
+    return("Absent")
+}
+
+tier_colours <- c(
+    "Exact"   = "#85D4E3",
+    "Partial" = "#F4B5BD",
+    "Absent"  = "#f0f0f0",
+    "Present" = "#FAD77B"
+)
+
+long_df <- df %>%
+    select(row_label, mutation_type, mutant, all_of(evidence_cols)) %>%
+    pivot_longer(cols      = all_of(evidence_cols),
+                 names_to  = "evidence",
+                 values_to = "value") %>%
+    rowwise() %>%
+    mutate(tier = assign_tier(evidence, value)) %>%
+    ungroup() %>%
+    mutate(
+        row_label = factor(row_label, levels = row_order),
+        evidence  = factor(evidence,
+                           levels = evidence_cols,
+                           labels = evidence_labels[evidence_cols]),
+        tier      = factor(tier, levels = c("Exact", "Partial", "Absent", "Present"))
+    )
+
+ggplot(long_df,
+       aes(x = evidence, y = row_label, fill = tier)) +
+    
+    geom_tile(colour = "white", linewidth = 0.5) +
+    
+    scale_fill_manual(
+        values = tier_colours,
+        name   = "Evidence level",
+        guide  = guide_legend(title.position = "top",
+                              keywidth  = unit(1.0, "cm"),
+                              keyheight = unit(0.5, "cm"))
+    ) +
+    
+    labs(x = NULL, y = NULL) +
+
+    geom_text(
+    	data = long_df %>%
+        	filter(
+            	evidence %in% c(
+                	evidence_labels["regional_frameshift"],
+                	evidence_labels["regional_indel"]
+            	),
+            	value == 1
+        	),
+    	label = "*",
+    	size = 5
+	) +
+
+    theme_minimal(base_size = 12) +
+    theme(
+        axis.text.x     = element_text(angle = 90, face = "bold", hjust = 1,
+                                       vjust = 0.5, size = 12),
+        axis.text.y     = element_text(size = 12, face = "bold", lineheight = 0.85,
+                                       family = "mono"),
+        panel.grid      = element_blank(),
+        legend.position = "bottom",
+        legend.box      = "horizontal",
+        legend.title    = element_text(face = "bold", size = 10),
+        legend.text     = element_text(size = 10, face = "bold"),
+        plot.margin     = margin(10, 50, 10, 20)
+    ) +
+    
+    coord_cartesian(clip = "off") +
+    scale_x_discrete(expand = expansion(add = c(0.5, 0.5)))
+
+###########################################################
+# Supplementary Figure S5A: Heat map of presence/absence from mutation screening all urine E. coli
+###########################################################
+
+df <- read_xlsx("Mutation_Screen_Tidy_All_Urine.xlsx")
+
+df <- df %>%
+    mutate(
+        position  = ifelse(aa_start == aa_end,
+                           as.character(aa_start),
+                           paste0(aa_start, "\u2013", aa_end)),
+        row_label = paste0(gene, " ", position, " [", mutant, "]\n(", mutation_type, ")")
+    )
+
+row_order <- rev(df$row_label)
+
+evidence_cols <- c(
+    "exact_missense",
+    "any_missense",
+    "exact_frameshift",
+    "regional_frameshift",
+    "gene_frameshift",
+    "exact_deletion",
+    "regional_indel",
+    "gene_indel",
+    "exact_stop",
+    "regional_stop",
+    "gene_stop",
+    "final_confirmed"
+)
+
+evidence_labels <- c(
+    "exact_missense"        = "Missense\n(exact)",
+    "any_missense"  = "Missense\n(any missense)",
+    "exact_frameshift"    = "Frameshift\n(exact position)",
+    "regional_frameshift" = "Frameshift\n(regional \u00b120 aa)",
+    "gene_frameshift"     = "Frameshift\n(gene-level)",
+    "exact_deletion"      = "Deletion\n(exact window)",
+    "regional_indel"      = "Indel\n(regional \u00b120 aa)",
+    "gene_indel"          = "Indel\n(gene-level)",
+    "exact_stop"		= "Stop codon\n(exact position)",
+    "regional_stop" 	= "Stop codon\n(regional \u00b120 aa)",
+    "gene_stop"		= "Stop codon\n(gene-level)",
+    "final_confirmed"	= "Confirmed"
+)
+
+exact_cols   <- c("exact_missense", "exact_frameshift",
+                  "exact_deletion", "stop_confirmed", "exact_stop")
+partial_cols <- c("any_missense", "regional_frameshift",
+                  "gene_frameshift", "regional_indel", "gene_indel", "regional_stop", "gene_stop")
+present_cols <- c("final_confirmed")
+
+assign_tier <- function(col, value) {
+    if (value == 0)            return("Absent")
+    if (col %in% exact_cols)   return("Exact")
+    if (col %in% partial_cols) return("Partial")
+    if (col %in% present_cols) return("Present")
+    return("Absent")
+}
+
+tier_colours <- c(
+    "Exact"   = "#85D4E3",
+    "Partial" = "#F4B5BD",
+    "Absent"  = "#f0f0f0",
+    "Present" = "#FAD77B"
+)
+
+long_df <- df %>%
+    select(row_label, mutation_type, mutant, all_of(evidence_cols)) %>%
+    pivot_longer(cols      = all_of(evidence_cols),
+                 names_to  = "evidence",
+                 values_to = "value") %>%
+    rowwise() %>%
+    mutate(tier = assign_tier(evidence, value)) %>%
+    ungroup() %>%
+    mutate(
+        row_label = factor(row_label, levels = row_order),
+        evidence  = factor(evidence,
+                           levels = evidence_cols,
+                           labels = evidence_labels[evidence_cols]),
+        tier      = factor(tier, levels = c("Exact", "Partial", "Absent", "Present"))
+    )
+
+ggplot(long_df,
+       aes(x = evidence, y = row_label, fill = tier)) +
+ 
+    geom_tile(colour = "white", linewidth = 0.5) +
+ 
+    scale_fill_manual(
+        values = tier_colours,
+        name   = "Evidence level",
+        guide  = guide_legend(title.position = "top",
+                              keywidth  = unit(1.0, "cm"),
+                              keyheight = unit(0.5, "cm"))
+    ) +
+ 
+    labs(x = NULL, y = NULL) +
+ 
+    theme_minimal(base_size = 12) +
+    theme(
+        axis.text.x     = element_text(angle = 90, face = "bold", hjust = 1,
+                                       vjust = 0.5, size = 12),
+        axis.text.y     = element_text(size = 12, face = "bold", lineheight = 0.85,
+                                       family = "mono"),
+        panel.grid      = element_blank(),
+        legend.position = "bottom",
+        legend.box      = "horizontal",
+        legend.title    = element_text(face = "bold", size = 10),
+        legend.text     = element_text(size = 10, face = "bold"),
+        plot.margin     = margin(10, 50, 10, 20)
+    ) +
+ 
+    coord_cartesian(clip = "off") +
+    scale_x_discrete(expand = expansion(add = c(0.5, 0.5)))
+
+####################################################
+# Supplementary Figure S5B: Barplot of the evidence of mutation calls per gene for all urine E. coli
+####################################################
+
+ggplot(
+    Evidence_Tidy,
+    aes(x = gene, y = unique)
+    ) +
+    geom_bar(
+        stat = "identity",
+        position = "stack",
+        aes(fill = mutation)
+    ) +
+    labs(
+        x = "Gene",
+        y = "Number"
+    ) +
+    scale_fill_brewer(
+	palette = "Set3",
+	name = "Mutation Type",
+	)+
+    theme_bw() +
+    theme(
+        axis.text    = element_text(size = 12, face = "bold"),
+        axis.title   = element_text(size = 18, face = "bold"),
+        legend.text  = element_text(size = 16),
+        legend.title = element_text(size = 16, face = "bold")
+    )
+
+####################################################
+# Supplementary Figure S5C: Staked barplot of the mutation spectrum of each gene for all urine E. coli
+####################################################
+
+ggplot(
+  Evo_Mutation_Spectrum_Tidy_All_Urine,
+  aes(
+    x = gene, y = value)
+  )+
+  geom_bar(
+    stat = "identity",
+    position = "stack",
+    aes(fill = mutation)
+  ) +
+  labs(
+    x = "Gene",
+    y = "Number"
+  ) +
+  scale_x_discrete(
+    limits = c(
+      "cyaA_34",
+      "glpT_34",
+      "ptsI_34",
+      "uhpC_34",
+      "uhpT_34",
+      "glpT_59",
+      "uhpA_59",
+      "uhpT_59"
+    )
+  ) +
+  scale_fill_brewer(
+	palette = "Set3",
+	name = "Mutation Type"
+  )+
+  theme_bw() +
+  theme(
+    axis.text    = element_text(size = 12, face = "bold"),
+    axis.title   = element_text(size = 18, face = "bold"),
+    legend.text  = element_text(size = 16),
+    legend.title = element_text(size = 16, face = "bold")
+  )
+
