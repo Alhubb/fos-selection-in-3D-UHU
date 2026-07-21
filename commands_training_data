@@ -51,21 +51,21 @@ $SCRIPTS/run_pipeline.sh
 # macse_output_clean (post-alignment gap filtered), not macse_output
 # ============================================================
 
-# --- Step 1: Build per-gene FASTAs ---
+# --- Build per-gene FASTAs ---
 # (done inline by run_pipeline.sh — no standalone script)
 
-# --- Step 2: Deduplicate per-gene FASTAs (cd-hit-est) ---
+# --- Deduplicate per-gene FASTAs (cd-hit-est) ---
 # (done inline by run_pipeline.sh)
 
-# --- Step 3: Clean per-gene FASTAs ---
+# --- Clean per-gene FASTAs ---
 conda run -n python python $SCRIPTS/clean_gene_fastas.py \
     $BASE/per_gene_fastas_dedup \
     $BASE/per_gene_fastas_clean
 
-# --- Step 4: MACSE codon-aware alignment ---
+# --- MACSE codon-aware alignment ---
 # (done inline by run_pipeline.sh using xargs -P 4)
 
-# --- Step 5: Clean MACSE alignments ---
+# --- Clean MACSE alignments ---
 STOP_LOST_GENES=$(awk -F'\t' '$4=="stop_lost" {print $1}' "$MUTATION_LIST" \
     | sort -u | paste -sd,)
 conda run -n python python $SCRIPTS/clean_macse_alignments.py \
@@ -73,25 +73,25 @@ conda run -n python python $SCRIPTS/clean_macse_alignments.py \
     $BASE/macse_output_clean \
     ${STOP_LOST_GENES:+--stop-lost-genes "$STOP_LOST_GENES"}
 
-# --- Step 6: MACSE mutation scan ---
+# --- MACSE mutation scan ---
 conda run -n python python $SCRIPTS/scan_mutations_cds_macse.py \
     $BASE/macse_output_clean \
     $MUTATION_LIST \
     > $BASE/mutation_cds_macse_strict_summary.tsv
 
-# --- Step 7: Frameshift detection ---
+# --- Frameshift detection ---
 conda run -n python python $SCRIPTS/detect_frameshifts_macse.py \
     $BASE/macse_output_clean \
     $MUTATION_LIST \
     $BASE/frameshifts.tsv
 
-# --- Step 8: In-frame indel detection ---
+# --- In-frame indel detection ---
 conda run -n python python $SCRIPTS/detect_indels_macse.py \
     $BASE/macse_output_clean \
     $MUTATION_LIST \
     $BASE/indels.tsv
 
-# --- Step 9: Stop mutation detection ---
+# --- Stop mutation detection ---
 # Requires MUTATION_LIST for position-aware tiering (exact/regional/gene)
 mkdir -p $BASE/stop_calls
 > $BASE/stop_calls/stop_calls.tsv
@@ -104,7 +104,7 @@ awk 'NF >= 4 { print $1 "\t" $2 "\t" $3 "\t" $4 }' \
     $BASE/stop_calls/stop_calls.tsv \
     | sort -u > $BASE/stop_genes.tsv
 
-# --- Step 10: Mutation screening ---
+# --- Mutation screening ---
 conda run -n python python $SCRIPTS/screen_mutations.py \
     --mutations   $MUTATION_LIST \
     --macse       $BASE/mutation_cds_macse_strict_summary.tsv \
@@ -113,7 +113,7 @@ conda run -n python python $SCRIPTS/screen_mutations.py \
     --stops       $BASE/stop_genes.tsv \
     --output      $BASE/mutation_screen_results.tsv
 
-# --- Step 11: Extract confirmed sequences (for visual verification) ---
+# --- Extract confirmed sequences (for visual verification) ---
 # --any:            also extract any_missense hits (e.g. cyaA 394)
 # --screen-results: needed for deletion component and regional extraction
 conda run -n python python $SCRIPTS/extract_confirmed_sequences.py \
