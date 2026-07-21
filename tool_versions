@@ -1,0 +1,16 @@
+bakta	software v1.12.0 | database v6.0
+biopython	v1.87
+GNU tools
+	awk	v5.0.1
+	grep	v3.4
+	sort	v8.30
+	uniq	v8.30
+	find	v4.7.0
+	xargs	v4.7.0
+MACSE	v2.07
+minimap2	v2.30-r1287
+pyani	0.3.0-alpha   
+python	v3.13.5
+seqkit	v2.13.0
+snippy	v4.6.0
+spades	v3.13.1
