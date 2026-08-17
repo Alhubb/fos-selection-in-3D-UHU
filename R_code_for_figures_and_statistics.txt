@@ -6,15 +6,18 @@ statistics used in the manuscript.
 
 Required input data objects:
 	MIC_Tidy.xlsx
+	X34Mut_Tidy.xlsx
+	X59Mut_Tidy.xlsx
+	Mutation_Screen_Tidy.xlsx
+	Evidence_Tidy.xlsx
+	Evo_Mutation_Spectrum_Tidy.xlsx
 	DD_Tidy_vsB.xlsx
 	Fitness_Tidy.xlsx
-	Mutation_Screen_Tidy2
-	X34Mut_Tidy
-	X59Mut_Tidy
-	Evo_Mutation_Spectrum_Tidy
+	ANI_Tidy.xlsx
+	Mutation_Screen_Tidy_TD.xlsx
+	Mutation_Screen_Tidy_All_Urine.xlsx
+	Evo_Mutation_Spectrum_Tidy_All_Urine.xlsx
 
-Author: Alasdair Hubbard
-Last updated: [Date]
 ##############################################
 
 ##########################
